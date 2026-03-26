@@ -1,0 +1,11 @@
+# Root-level ignores
+node_modules/
+.DS_Store
+
+# Env files
+.env
+.env.local
+
+# Build outputs
+dist/
+server/dist/
