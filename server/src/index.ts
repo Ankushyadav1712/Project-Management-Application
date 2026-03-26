@@ -20,7 +20,11 @@ connectDB();
 // Middleware
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: [
+      "http://localhost:5173",
+      "https://project-management-application-mu.vercel.app",
+      process.env.CLIENT_URL || "http://localhost:5173",
+    ],
     credentials: true,
   })
 );
