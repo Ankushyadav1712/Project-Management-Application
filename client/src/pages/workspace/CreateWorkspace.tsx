@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Briefcase } from "lucide-react";
+import { toast } from "sonner";
 
 const schema = z.object({
   name: z.string().min(2, "Name too short"),
@@ -24,6 +25,7 @@ export default function CreateWorkspace() {
     try {
       const res = await api.post("/workspaces", data);
       await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      toast.success("Workspace created");
       navigate(`/workspace/${res.data.workspace._id}`);
     } catch (err: unknown) {
       interface ApiError { response?: { data?: { message?: string } } }

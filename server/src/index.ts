@@ -8,6 +8,8 @@ import authRoutes from "./routes/authRoutes";
 import workspaceRoutes from "./routes/workspaceRoutes";
 import projectRoutes from "./routes/projectRoutes";
 import taskRoutes from "./routes/taskRoutes";
+import commentRoutes from "./routes/commentRoutes";
+import searchRoutes from "./routes/searchRoutes";
 
 dotenv.config();
 
@@ -37,6 +39,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/workspaces", workspaceRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/tasks", taskRoutes);
+app.use("/api/comments", commentRoutes);
+app.use("/api/search", searchRoutes);
 
 // Health check
 app.get("/", (_req, res) => {

@@ -1,15 +1,21 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
 import api from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
-import { BarChart3, FolderKanban, CheckCircle2, Clock, Circle, Loader2, ArrowRight } from "lucide-react";
-
+import { BarChart3, FolderKanban, CheckCircle2, Clock, Loader2, ArrowRight } from "lucide-react";
 
 interface RecentTask { _id: string; title: string; status: string; priority: string; project: { name: string; emoji: string }; }
+
+interface PriorityStat { _id: string; count: number; }
+interface ProjectStat { name: string; count: number; }
+
 interface Analytics {
   totalProjects: number; totalTasks: number;
   todoTasks: number; inProgressTasks: number; doneTasks: number;
   recentTasks: RecentTask[];
+  tasksByPriority: PriorityStat[];
+  tasksPerProject: ProjectStat[];
 }
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -17,6 +23,16 @@ const PRIORITY_COLORS: Record<string, string> = {
   medium: "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400",
   high: "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400",
 };
+
+const CHART_COLORS = {
+  blue: "#6366f1",
+  green: "#22c55e",
+  amber: "#f59e0b",
+  gray: "#9ca3af",
+  red: "#ef4444"
+};
+
+
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -31,11 +47,25 @@ export default function Dashboard() {
     enabled: !!workspaceId,
   });
 
-  const analytics: Analytics = data || { totalProjects: 0, totalTasks: 0, todoTasks: 0, inProgressTasks: 0, doneTasks: 0, recentTasks: [] };
-  const donePercent = analytics.totalTasks > 0 ? Math.round((analytics.doneTasks / analytics.totalTasks) * 100) : 0;
+  const analytics: Analytics = data || { 
+    totalProjects: 0, totalTasks: 0, todoTasks: 0, inProgressTasks: 0, doneTasks: 0, 
+    recentTasks: [], tasksByPriority: [], tasksPerProject: [] 
+  };
+  
+  const statusData = [
+    { name: "To Do", value: analytics.todoTasks, color: CHART_COLORS.gray },
+    { name: "In Progress", value: analytics.inProgressTasks, color: CHART_COLORS.amber },
+    { name: "Done", value: analytics.doneTasks, color: CHART_COLORS.green },
+  ].filter(d => d.value > 0);
+
+  const priorityData = analytics.tasksByPriority.map(p => ({
+    name: p._id.charAt(0).toUpperCase() + p._id.slice(1),
+    value: p.count,
+    color: p._id === 'high' ? CHART_COLORS.red : p._id === 'medium' ? CHART_COLORS.amber : CHART_COLORS.blue
+  }));
 
   return (
-    <div className="p-6 max-w-5xl mx-auto animate-fade-in">
+    <div className="p-6 max-w-7xl mx-auto animate-fade-in">
       {/* Welcome */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Good day, {user?.name?.split(" ")[0]} 👋</h1>
@@ -64,52 +94,132 @@ export default function Dashboard() {
             ))}
           </div>
 
-          {/* Progress + Recent Tasks */}
+          {/* Charts Row 1 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            
+            {/* Task Status Donut Chart */}
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-5 flex flex-col">
+              <h2 className="font-semibold text-gray-900 dark:text-white mb-4">Task Completion</h2>
+              {analytics.totalTasks === 0 ? (
+                <div className="flex-1 flex items-center justify-center text-sm text-gray-400">No tasks to display</div>
+              ) : (
+                <div className="h-64 mt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={statusData}
+                        cx="50%" cy="50%"
+                        innerRadius={60} outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {statusData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} 
+                      />
+                      <Legend verticalAlign="bottom" height={36} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+
+            {/* Tasks Per Project Bar Chart */}
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-5 flex flex-col">
+              <h2 className="font-semibold text-gray-900 dark:text-white mb-4">Tasks per Project</h2>
+              {analytics.tasksPerProject.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center text-sm text-gray-400">No projects to display</div>
+              ) : (
+                <div className="h-64 mt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analytics.tasksPerProject} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
+                      <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
+                      <Tooltip 
+                        cursor={{ fill: 'rgba(99, 102, 241, 0.1)' }}
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      />
+                      <Bar dataKey="count" fill={CHART_COLORS.blue} radius={[4, 4, 0, 0]} maxBarSize={50} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          {/* Charts Row 2 */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Progress */}
-            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-5">
-              <h2 className="font-semibold text-gray-900 dark:text-white mb-4">Overall Progress</h2>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-500 dark:text-gray-400">Completion rate</span>
-                <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{donePercent}%</span>
-              </div>
-              <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2.5 mb-4">
-                <div className="bg-indigo-500 h-2.5 rounded-full transition-all duration-700" style={{ width: `${donePercent}%` }} />
-              </div>
-              <div className="space-y-2 mt-4">
-                {[
-                  { label: "To Do", count: analytics.todoTasks, icon: <Circle size={13} />, color: "text-gray-400" },
-                  { label: "In Progress", count: analytics.inProgressTasks, icon: <Clock size={13} />, color: "text-amber-500" },
-                  { label: "Done", count: analytics.doneTasks, icon: <CheckCircle2 size={13} />, color: "text-green-500" },
-                ].map(s => (
-                  <div key={s.label} className="flex items-center justify-between text-sm">
-                    <div className={`flex items-center gap-1.5 ${s.color}`}>{s.icon}<span className="text-gray-600 dark:text-gray-400">{s.label}</span></div>
-                    <span className="font-semibold text-gray-900 dark:text-white">{s.count}</span>
-                  </div>
-                ))}
-              </div>
+            
+            {/* Priority Breakdown Pie Chart */}
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-5 flex flex-col">
+              <h2 className="font-semibold text-gray-900 dark:text-white mb-2">Priority Breakdown</h2>
+              {analytics.tasksByPriority.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center text-sm text-gray-400 py-10">No priority data</div>
+              ) : (
+                <div className="h-56 mt-4">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={priorityData}
+                        cx="50%" cy="50%"
+                        outerRadius={70}
+                        dataKey="value"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                      >
+                        {priorityData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
 
             {/* Recent Tasks */}
-            <div className="lg:col-span-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-5">
-              <h2 className="font-semibold text-gray-900 dark:text-white mb-4">Recent Tasks</h2>
+            <div className="lg:col-span-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-5 flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold text-gray-900 dark:text-white">Recent Tasks</h2>
+                <button 
+                  onClick={() => navigate('/tasks')} 
+                  className="text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-medium"
+                >
+                  View all
+                </button>
+              </div>
+              
               {analytics.recentTasks.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8">No tasks yet. Start by creating a project!</p>
+                <div className="flex-1 flex items-center justify-center text-sm text-gray-400">No tasks yet. Start by creating a project!</div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 flex-1">
                   {analytics.recentTasks.map(task => (
                     <div key={task._id} onClick={() => navigate(`/task/${task._id}`)}
-                      className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition group">
+                      className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/60 cursor-pointer transition group border border-transparent hover:border-gray-100 dark:hover:border-gray-700">
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-lg">{task.project?.emoji}</span>
+                        <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-lg shadow-inner">
+                          {task.project?.emoji}
+                        </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{task.title}</p>
-                          <p className="text-xs text-gray-400">{task.project?.name}</p>
+                          <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{task.title}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 max-w-[200px] truncate">{task.project?.name}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PRIORITY_COLORS[task.priority]}`}>{task.priority}</span>
-                        <ArrowRight size={14} className="text-gray-300 group-hover:text-indigo-400 transition" />
+                      <div className="flex items-center gap-3 ml-2 flex-shrink-0">
+                        {task.status === 'done' ? (
+                           <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-500 bg-green-50 dark:bg-green-500/10 px-2 py-1 rounded-md font-medium"><CheckCircle2 size={12}/> Done</span>
+                        ) : (
+                           <span className={`text-xs px-2.5 py-1 rounded-md font-medium border border-transparent ${PRIORITY_COLORS[task.priority]}`}>{task.priority}</span>
+                        )}
+                        <div className="w-8 flex justify-end">
+                          <ArrowRight size={16} className="text-gray-300 dark:text-gray-600 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
+                        </div>
                       </div>
                     </div>
                   ))}

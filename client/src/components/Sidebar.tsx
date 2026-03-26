@@ -4,16 +4,20 @@ import { useAuth } from "../context/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import api from "../lib/api";
 import { cn, getInitials } from "../lib/utils";
+import { useTheme } from "../context/ThemeContext";
 import {
   LayoutDashboard, Plus, ChevronDown,
-  LogOut, Settings, Menu, X, Briefcase,
+  LogOut, Settings, Menu, X, Briefcase, Search, Moon, Sun
 } from "lucide-react";
 
 interface Workspace { _id: string; name: string; }
 interface Project { _id: string; name: string; emoji: string; }
 
-export default function Sidebar() {
+interface SidebarProps { onOpenSearch?: () => void; }
+
+export default function Sidebar({ onOpenSearch }: SidebarProps = {}) {
   const { user, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
@@ -102,8 +106,21 @@ export default function Sidebar() {
         </div>
       )}
 
-      {/* Nav */}
+    {/* Nav */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        <button onClick={onOpenSearch}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all text-left">
+          <div className="flex items-center gap-3">
+            <Search size={17} />
+            {!collapsed && <span>Search</span>}
+          </div>
+          {!collapsed && (
+            <div className="flex items-center gap-1 text-[10px] font-semibold tracking-widest text-gray-400 dark:text-gray-500 opacity-70">
+              <span className="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded leading-none border border-gray-300 dark:border-gray-600">CMD</span>
+              <span className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded leading-none border border-gray-300 dark:border-gray-600">K</span>
+            </div>
+          )}
+        </button>
         {navItem(workspaceId ? `/workspace/${workspaceId}` : "/", <LayoutDashboard size={17} />, "Dashboard")}
         {!collapsed && projects.length > 0 && (
           <div className="pt-3">
@@ -144,12 +161,23 @@ export default function Sidebar() {
               </div>
             )}
           </div>
-          {!collapsed && (
-            <button onClick={handleLogout} title="Logout"
-              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 text-gray-400 hover:text-red-500 transition">
-              <LogOut size={16} />
-            </button>
-          )}
+          <div className="flex items-center gap-1">
+            {!collapsed && (
+              <button 
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")} 
+                title="Toggle Theme"
+                className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-900 dark:hover:text-white transition"
+              >
+                {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+            )}
+            {!collapsed && (
+              <button onClick={handleLogout} title="Logout"
+                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 text-gray-400 hover:text-red-500 transition">
+                <LogOut size={16} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </aside>

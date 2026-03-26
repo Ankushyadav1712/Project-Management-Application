@@ -6,6 +6,8 @@ import {
   updateWorkspace,
   deleteWorkspace,
   getWorkspaceAnalytics,
+  addWorkspaceMember,
+  removeWorkspaceMember,
 } from "../controllers/workspaceController";
 import {
   createProject,
@@ -23,6 +25,8 @@ router.get("/:id", getWorkspaceById);
 router.patch("/:id", updateWorkspace);
 router.delete("/:id", deleteWorkspace);
 router.get("/:id/analytics", getWorkspaceAnalytics);
+router.post("/:id/members", addWorkspaceMember);
+router.delete("/:id/members/:memberId", removeWorkspaceMember);
 
 // Projects nested under workspace
 router.post("/:workspaceId/projects", createProject);

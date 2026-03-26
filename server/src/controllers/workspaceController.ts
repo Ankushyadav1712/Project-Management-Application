@@ -2,6 +2,7 @@ import { Response } from "express";
 import Workspace from "../models/Workspace";
 import Task from "../models/Task";
 import Project from "../models/Project";
+import User from "../models/User";
 import { AuthRequest } from "../middlewares/auth";
 import mongoose from "mongoose";
 
@@ -148,6 +149,19 @@ export const getWorkspaceAnalytics = async (
       .populate("assignedTo", "name profilePicture")
       .populate("project", "name emoji");
 
+    const tasksByPriority = await Task.aggregate([
+      { $match: { workspace: workspaceId } },
+      { $group: { _id: "$priority", count: { $sum: 1 } } }
+    ]);
+
+    const tasksPerProject = await Task.aggregate([
+      { $match: { workspace: workspaceId } },
+      { $group: { _id: "$project", count: { $sum: 1 } } },
+      { $lookup: { from: "projects", localField: "_id", foreignField: "_id", as: "project" } },
+      { $unwind: "$project" },
+      { $project: { name: "$project.name", count: 1, _id: 0 } }
+    ]);
+
     res.json({
       totalProjects,
       totalTasks,
@@ -155,7 +169,92 @@ export const getWorkspaceAnalytics = async (
       inProgressTasks,
       doneTasks,
       recentTasks,
+      tasksByPriority,
+      tasksPerProject,
     });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+// POST /api/workspaces/:id/members
+export const addWorkspaceMember = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { email, role = "member" } = req.body;
+    const workspace = await Workspace.findById(req.params.id);
+
+    if (!workspace) {
+      res.status(404).json({ message: "Workspace not found" });
+      return;
+    }
+
+    const currentMember = workspace.members.find(
+      (m) => m.user.toString() === req.user!._id.toString()
+    );
+    if (!currentMember || (currentMember.role !== "owner" && currentMember.role !== "admin")) {
+      res.status(403).json({ message: "Not authorized to add members" });
+      return;
+    }
+
+    const userToAdd = await User.findOne({ email: email.toLowerCase() });
+    if (!userToAdd) {
+      res.status(404).json({ message: "User with this email not found" });
+      return;
+    }
+
+    if (workspace.members.some((m) => m.user.toString() === userToAdd._id.toString())) {
+      res.status(400).json({ message: "User is already a member" });
+      return;
+    }
+
+    workspace.members.push({ user: userToAdd._id, role, joinedAt: new Date() });
+    await workspace.save();
+    await workspace.populate("members.user", "name email profilePicture");
+
+    res.json({ message: "Member added successfully", workspace });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+// DELETE /api/workspaces/:id/members/:memberId
+export const removeWorkspaceMember = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const workspace = await Workspace.findById(req.params.id);
+
+    if (!workspace) {
+      res.status(404).json({ message: "Workspace not found" });
+      return;
+    }
+
+    const currentMember = workspace.members.find(
+      (m) => m.user.toString() === req.user!._id.toString()
+    );
+    
+    const isSelfRemove = req.user!._id.toString() === req.params.memberId;
+    if (!isSelfRemove && (!currentMember || (currentMember.role !== "owner" && currentMember.role !== "admin"))) {
+      res.status(403).json({ message: "Not authorized to remove members" });
+      return;
+    }
+
+    const targetMember = workspace.members.find(m => m.user.toString() === req.params.memberId);
+    if (targetMember?.role === "owner" && !isSelfRemove) {
+      res.status(400).json({ message: "Cannot remove the workspace owner" });
+      return;
+    }
+
+    workspace.members = workspace.members.filter(
+      (m) => m.user.toString() !== req.params.memberId
+    );
+    await workspace.save();
+
+    res.json({ message: "Member removed successfully" });
   } catch (error) {
     res.status(500).json({ message: "Server error", error });
   }

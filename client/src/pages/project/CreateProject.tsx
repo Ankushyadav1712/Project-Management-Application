@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const EMOJIS = ["📋", "🚀", "💡", "🎯", "🔥", "🛠️", "📊", "🎨", "🌟", "⚡"];
 
@@ -37,10 +38,13 @@ export default function CreateProject() {
         emoji: selectedEmoji,
       });
       await queryClient.invalidateQueries({ queryKey: ["projects", workspaceId] });
+      toast.success("Project created");
       navigate(`/project/${res.data.project._id}`);
     } catch (err: unknown) {
       interface ApiError { response?: { data?: { message?: string } } }
-      setError((err as ApiError)?.response?.data?.message || "Failed to create project");
+      const errorMsg = (err as ApiError)?.response?.data?.message || "Failed to create project";
+      setError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 
